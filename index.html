@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bourse-École — Simulateur d'investissement</title>
+<meta name="description" content="Simulateur boursier éducatif pour adolescents. Achète et vends des actions virtuelles, suis les actualités du marché et apprends comment fonctionnent les investissements.">
+<meta name="theme-color" content="#0E5C50">
+
+<!-- Open Graph -->
+<meta property="og:title" content="Bourse-École — Simulateur d'investissement">
+<meta property="og:description" content="Apprends à investir en jouant — sans risquer un sou.">
+<meta property="og:type" content="website">
+
+<!-- Favicon (inline SVG) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230E5C50'/%3E%3Cpath d='M20 70 L40 50 L55 60 L80 30' stroke='%23F5EFE3' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='80' cy='30' r='5' fill='%23E8D9B5'/%3E%3C/svg%3E">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css" rel="stylesheet">
+
+<!-- App styles -->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="login">
+  <div class="panel left">
+    <div class="brand">Bourse-École</div>
+    <div class="tagline">Apprends à investir en jouant — sans risquer un sou.</div>
+    <div class="feat-list">
+      <div class="feat"><i class="ti ti-chart-line"></i><div><div class="feat-t">20 grands titres réels</div><div class="feat-d">Technologies, communications, métaux, manufacturier — les leaders de chaque secteur.</div></div></div>
+      <div class="feat"><i class="ti ti-bolt"></i><div><div class="feat-t">Marché en direct</div><div class="feat-d">Les cours évoluent toutes les 2 secondes, même quand tu fermes la page.</div></div></div>
+      <div class="feat"><i class="ti ti-news"></i><div><div class="feat-t">Actualités qui comptent</div><div class="feat-d">Quand une nouvelle tombe, vois le marché réagir et comprends pourquoi.</div></div></div>
+      <div class="feat"><i class="ti ti-trophy"></i><div><div class="feat-t">Classement de la classe</div><div class="feat-d">Compare ta performance avec celle de tes camarades.</div></div></div>
+    </div>
+  </div>
+  <div class="panel right">
+    <div class="inner">
+      <h2>Connecte-toi</h2>
+      <div class="sub">Entre ton nom d'utilisateur et ton NIP à 3 chiffres.</div>
+      <div class="err" id="login-err"></div>
+      <div class="field">
+        <label for="li-user">Nom d'utilisateur</label>
+        <input type="text" id="li-user" placeholder="alex, sam, jordan, prof" autocomplete="off" autofocus>
+      </div>
+      <div class="field">
+        <label for="li-pass">NIP (3 chiffres)</label>
+        <input type="password" id="li-pass" maxlength="3" inputmode="numeric" pattern="[0-9]*" placeholder="•••">
+      </div>
+      <button class="btn-go" id="li-go">Entrer dans le marché →</button>
+      <div class="accounts">
+        <div class="accounts-t">Comptes de démonstration (clique pour remplir)</div>
+        <div class="acc" data-u="alex" data-p="100"><span>alex</span><span>NIP: 100</span></div>
+        <div class="acc" data-u="sam" data-p="200"><span>sam</span><span>NIP: 200</span></div>
+        <div class="acc" data-u="jordan" data-p="300"><span>jordan</span><span>NIP: 300</span></div>
+        <div class="acc" data-u="prof" data-p="999"><span>prof (admin)</span><span>NIP: 999</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP (USER) ============ -->
+<div id="app">
+  <nav class="topnav">
+    <div class="brand-row">
+      <div class="logo">Bourse-École</div>
+      <div class="market-status"><span class="dot"></span><span>Marché ouvert</span></div>
+    </div>
+    <div class="user-chip">
+      <div class="avatar" id="u-avatar">?</div>
+      <span class="uname" id="u-name">—</span>
+      <button class="icon-btn" id="b-help" title="Aide"><i class="ti ti-help"></i></button>
+      <button class="icon-btn" id="b-logout" title="Déconnexion"><i class="ti ti-logout"></i></button>
+    </div>
+  </nav>
+  <div class="ticker-tape"><div class="ticker-track" id="ticker-track"></div></div>
+  <div class="container">
+    <div id="welcome-banner"></div>
+    <div class="grid-main">
+      <div class="main-col">
+        <div class="news" id="news-display">
+          <div class="news-empty">Le marché est calme… attendons les prochaines nouvelles.</div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Liquidités</div><div class="metric-value" id="m-cash">—</div></div>
+          <div class="metric"><div class="metric-label">Portefeuille</div><div class="metric-value" id="m-port">—</div></div>
+          <div class="metric accent"><div class="metric-label">Total</div><div class="metric-value" id="m-total">—</div></div>
+          <div class="metric"><div class="metric-label">Gains / pertes</div><div class="metric-value" id="m-pnl">—</div><div class="metric-sub" id="m-pnl-pct"></div></div>
+        </div>
+        <div class="flash" id="user-flash"></div>
+        <div class="section-h"><h3>Marché</h3></div>
+        <div class="sector-tabs" id="sector-tabs"></div>
+        <div class="stock-list" id="stock-list"></div>
+      </div>
+      <div class="side-col">
+        <div class="card">
+          <h4>Mes positions <span class="count" id="pos-count" style="font-size:13px;color:var(--text3);font-family:var(--mono);font-weight:400"></span></h4>
+          <div id="portfolio"></div>
+        </div>
+        <div class="card">
+          <h4>Mes badges</h4>
+          <div class="badges" id="badge-list"></div>
+        </div>
+        <div class="card">
+          <h4>Classement</h4>
+          <div id="leaderboard"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ADMIN ============ -->
+<div id="admin">
+  <nav class="topnav" style="border-bottom-color:var(--gold)">
+    <div class="brand-row">
+      <div class="logo">Bourse-École · Enseignant</div>
+      <div class="market-status"><span class="dot"></span><span>Marché en direct</span></div>
+    </div>
+    <div class="user-chip">
+      <div class="avatar admin">P</div>
+      <span class="uname">prof</span>
+      <button class="icon-btn" id="ba-logout" title="Déconnexion"><i class="ti ti-logout"></i></button>
+    </div>
+  </nav>
+  <div class="container">
+    <div class="section-h"><h3>Tableau de bord</h3></div>
+    <div class="adm-grid" id="adm-metrics"></div>
+    <div class="flash flash-success" id="adm-flash"></div>
+    <div class="section-h"><h3>Mes étudiants</h3></div>
+    <table class="adm-table"><thead><tr><th>Étudiant</th><th>Budget initial</th><th>Liquidités</th><th>Portefeuille</th><th>Gains / pertes</th><th></th></tr></thead><tbody id="adm-tbody"></tbody></table>
+    <div class="adm-actions">
+      <button class="btn-action" id="ba-skip"><i class="ti ti-clock-bolt"></i>Avancer de 5 minutes</button>
+      <button class="btn-action" id="ba-reset"><i class="ti ti-refresh"></i>Réinitialiser le marché</button>
+      <button class="btn-action" id="ba-wipe" style="color:var(--danger);border-color:var(--danger)"><i class="ti ti-trash"></i>Tout effacer</button>
+    </div>
+    <div style="margin-top:32px"></div>
+    <div class="section-h"><h3>Fil d'actualités</h3></div>
+    <div class="card" id="adm-news"></div>
+  </div>
+</div>
+
+<div class="toast-area" id="toasts"></div>
+<div id="modal-host"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

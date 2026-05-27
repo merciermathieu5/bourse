@@ -7,7 +7,18 @@ const TICK_MS = 2000;
 const HISTORY_LEN = 60;
 const MAX_CATCHUP_TICKS = 500;
 const NEWS_DURATION_TICKS = 20;
-const NEWS_CHANCE = 0.014;
+
+// Cadence des actualités : un événement boursier toutes les 2 minutes (déterministe).
+const NEWS_INTERVAL_MS = 120000;
+const NEWS_INTERVAL_TICKS = Math.max(1, Math.round(NEWS_INTERVAL_MS / TICK_MS));
+
+// Scénario d'événements MAJEURS : un par 24 h, pendant 1 mois (30 jours).
+const SCENARIO_DAYS = 30;
+const SCENARIO_DAY_MS = 24 * 60 * 60 * 1000;
+const MAJOR_DURATION_TICKS = 75;   // durée d'effet d'un événement majeur (~2,5 min)
+
+const MIN_PASSWORD_LEN = 3;        // longueur minimale d'un NIP / mot de passe
+const NEWSLOG_MAX = 30;            // nombre d'actualités conservées dans l'historique
 
 // ============ DATA ============
 const SECTORS = [
@@ -64,6 +75,43 @@ const NEWS_POOL = [
   {ticker:'RIO',   bias:+0.8, text:"Rio Tinto signe un partenariat lithium pour batteries EV.", why:"Le lithium est crucial pour les voitures électriques — secteur en pleine croissance."}
 ];
 
+// ============ SCÉNARIO : ÉVÉNEMENTS MAJEURS (1 par 24 h, pendant 1 mois) ============
+// scope : 'market' (tout le marché), 'sector' (un secteur entier) ou 'ticker' (un seul titre)
+// target : id de secteur, ticker, ou null pour le marché entier
+// bias  : force (positif = hausse, négatif = baisse). Plus fort que les actus régulières.
+const SCENARIO = [
+  {day:1,  scope:'market', target:null,    bias:+1.6, text:"La banque centrale baisse ses taux d'intérêt — rallye général.", why:"Des taux plus bas rendent l'emprunt moins cher et poussent les investisseurs vers les actions."},
+  {day:2,  scope:'sector', target:'tech',  bias:+2.4, text:"Vague d'optimisme sur l'IA — le secteur technologique s'envole.", why:"L'engouement pour l'intelligence artificielle attire les capitaux vers les entreprises techno."},
+  {day:3,  scope:'sector', target:'metal', bias:+2.2, text:"Pénurie mondiale de cuivre — flambée des prix des métaux.", why:"Quand l'offre d'une matière première chute, son prix et celui des miniers grimpent."},
+  {day:4,  scope:'ticker', target:'NVDA',  bias:+3.2, text:"NVIDIA pulvérise les attentes avec une nouvelle puce IA.", why:"Un produit phare très demandé fait fortement grimper le titre."},
+  {day:5,  scope:'sector', target:'manuf', bias:+2.0, text:"Plan d'infrastructure national de 1 000 G$ adopté.", why:"D'énormes dépenses publiques profitent aux fabricants de machines et d'équipements."},
+  {day:6,  scope:'ticker', target:'BA',    bias:-3.0, text:"Boeing immobilise une flotte après un incident technique.", why:"Un problème de sécurité effraie les clients et les investisseurs."},
+  {day:7,  scope:'sector', target:'comm',  bias:+1.8, text:"Déploiement massif de la 5G — les télécoms en profitent.", why:"De nouveaux services génèrent des revenus supplémentaires pour les opérateurs."},
+  {day:8,  scope:'market', target:null,    bias:-1.8, text:"Inflation plus forte que prévu — les marchés reculent.", why:"Une inflation élevée laisse craindre une remontée des taux et pèse sur les actions."},
+  {day:9,  scope:'ticker', target:'AAPL',  bias:-2.6, text:"Apple visé par une lourde amende antitrust en Europe.", why:"Les sanctions réglementaires réduisent les profits attendus."},
+  {day:10, scope:'sector', target:'metal', bias:+2.4, text:"L'or atteint un sommet historique.", why:"En période d'incertitude, les investisseurs se réfugient dans l'or, ce qui profite aux mines."},
+  {day:11, scope:'sector', target:'tech',  bias:-2.2, text:"Une cyberattaque majeure secoue le secteur technologique.", why:"Les failles de sécurité coûtent cher et ébranlent la confiance des marchés."},
+  {day:12, scope:'ticker', target:'MSFT',  bias:+2.8, text:"Microsoft remporte un contrat cloud gouvernemental record.", why:"Un contrat géant garantit d'importants revenus futurs."},
+  {day:13, scope:'market', target:null,    bias:-2.4, text:"Tensions géopolitiques — correction généralisée des marchés.", why:"L'incertitude internationale pousse les investisseurs à vendre par prudence."},
+  {day:14, scope:'sector', target:'manuf', bias:-2.0, text:"Hausse du prix de l'acier — les marges des fabricants se contractent.", why:"Des coûts de production plus élevés rognent les profits."},
+  {day:15, scope:'ticker', target:'META',  bias:+2.6, text:"Meta dévoile des résultats publicitaires exceptionnels.", why:"Des revenus publicitaires en hausse rassurent les investisseurs."},
+  {day:16, scope:'sector', target:'comm',  bias:-1.8, text:"Guerre des prix dans le mobile — les marges fondent.", why:"Baisser les prix pour retenir les clients réduit la rentabilité."},
+  {day:17, scope:'sector', target:'metal', bias:-2.2, text:"Ralentissement de la construction en Chine — chute de la demande de métaux.", why:"Moins de chantiers signifie moins de métaux achetés."},
+  {day:18, scope:'market', target:null,    bias:+1.8, text:"Saison des résultats solide — regain de confiance.", why:"De bons bénéfices d'entreprise encouragent l'achat d'actions."},
+  {day:19, scope:'ticker', target:'CAT',   bias:+2.6, text:"Caterpillar relève fortement ses prévisions annuelles.", why:"Des perspectives optimistes attirent les investisseurs."},
+  {day:20, scope:'sector', target:'tech',  bias:+2.4, text:"Percée majeure dans les semi-conducteurs.", why:"Une avancée technologique ouvre de nouveaux marchés très lucratifs."},
+  {day:21, scope:'ticker', target:'VALE',  bias:-2.8, text:"Vale suspend une mine après un incident environnemental.", why:"L'arrêt de la production réduit directement les revenus."},
+  {day:22, scope:'market', target:null,    bias:-2.6, text:"Crainte de récession — vente massive sur les marchés.", why:"Si les investisseurs anticipent une récession, ils se débarrassent des actions risquées."},
+  {day:23, scope:'sector', target:'manuf', bias:+2.2, text:"Boom des commandes au salon aéronautique.", why:"Un carnet de commandes rempli promet des revenus pour plusieurs années."},
+  {day:24, scope:'ticker', target:'GOOGL', bias:+2.6, text:"Google lance un service d'IA grand public à succès.", why:"Un nouveau produit populaire fait grimper les revenus attendus."},
+  {day:25, scope:'sector', target:'comm',  bias:+2.0, text:"Fusion surprise entre deux grands opérateurs télécoms.", why:"Une fusion peut réduire les coûts et renforcer la position sur le marché."},
+  {day:26, scope:'sector', target:'metal', bias:+2.6, text:"Le lithium s'envole avec la demande de batteries électriques.", why:"L'essor des voitures électriques dope la demande de lithium."},
+  {day:27, scope:'market', target:null,    bias:+1.6, text:"La banque centrale rassure : pas de nouvelle hausse des taux.", why:"La stabilité des taux soulage les marchés et favorise les actions."},
+  {day:28, scope:'ticker', target:'GE',    bias:+2.4, text:"GE Aerospace décroche un méga-contrat de moteurs.", why:"Un contrat majeur sécurise des revenus à long terme."},
+  {day:29, scope:'sector', target:'tech',  bias:-2.0, text:"Nouvelle réglementation stricte sur l'IA en Europe.", why:"Des règles contraignantes augmentent les coûts et freinent la croissance."},
+  {day:30, scope:'market', target:null,    bias:+2.2, text:"Fin de mois en fanfare — rallye généralisé de clôture.", why:"L'optimisme de fin de période pousse de nombreux titres à la hausse."}
+];
+
 const BADGES = [
   {id:'first_trade', icon:'ti-flag-3',     label:'Premier pas',           desc:'Effectue ta première transaction.'},
   {id:'first_gain',  icon:'ti-trending-up', label:'Dans le vert',         desc:'Reviens au-dessus de ton budget initial.'},
@@ -84,6 +132,7 @@ function defaultState(){
       jordan: { password:'300', role:'student', initialBudget:10000, cash:10000, portfolio:{}, trades:0, badges:[] },
       prof:   { password:'999', role:'admin' }
     },
+    scenario: { active:false, startTime:null, lastDayFired:0, completed:false },
     meta: { createdAt: Date.now(), seenTutorial: {} }
   };
 }
@@ -116,20 +165,88 @@ function portfolioValue(acc){ let v=0; for(const t in (acc.portfolio||{})) v += 
 function totalValue(acc){ return acc.cash + portfolioValue(acc); }
 
 // ============ SIMULATION ============
-function tickOnce(recordHistory){
-  // Maybe fire news
-  if (Math.random() < NEWS_CHANCE && S.market.activeNews.length < 2) {
-    const tmpl = NEWS_POOL[Math.floor(Math.random() * NEWS_POOL.length)];
-    S.market.activeNews.push({...tmpl, ticksLeft: NEWS_DURATION_TICKS});
-    S.market.newsLog.unshift({...tmpl, time: Date.now()});
-    if (S.market.newsLog.length > 20) S.market.newsLog.pop();
+// Un événement (actu régulière ou majeur) s'applique-t-il à ce titre ?
+function eventAppliesTo(ev, def){
+  if (ev.scope === 'market') return true;
+  if (ev.scope === 'sector') return def.sector === ev.target;
+  return def.ticker === (ev.target || ev.ticker);
+}
+
+// Étiquette affichée (pastille) pour une actu : ticker, nom de secteur, ou « MARCHÉ »
+function eventPill(item){
+  if (item.scope === 'market') return 'MARCHÉ';
+  if (item.scope === 'sector') {
+    const sec = SECTORS.find(s => s.id === item.target);
+    return sec ? sec.label.toUpperCase() : 'SECTEUR';
   }
-  S.market.activeNews = S.market.activeNews.filter(n => --n.ticksLeft > 0);
+  return item.target || item.ticker || '—';
+}
+
+// Déclenche une actualité régulière (toutes les 2 minutes)
+function fireRegularNews(){
+  const tmpl = NEWS_POOL[Math.floor(Math.random() * NEWS_POOL.length)];
+  S.market.activeNews.push({
+    scope:'ticker', target:tmpl.ticker, ticker:tmpl.ticker,
+    bias:tmpl.bias, text:tmpl.text, why:tmpl.why, major:false,
+    ticksLeft: NEWS_DURATION_TICKS
+  });
+  S.market.newsLog.unshift({
+    scope:'ticker', target:tmpl.ticker, ticker:tmpl.ticker,
+    bias:tmpl.bias, text:tmpl.text, why:tmpl.why, major:false, time: Date.now()
+  });
+  if (S.market.newsLog.length > NEWSLOG_MAX) S.market.newsLog.pop();
+}
+
+// Déclenche l'événement majeur d'un jour donné du scénario
+function fireMajorEvent(day, activate){
+  const e = SCENARIO.find(x => x.day === day);
+  if (!e) return;
+  if (activate) {
+    S.market.activeNews.push({
+      scope:e.scope, target:e.target, ticker:e.target,
+      bias:e.bias, text:e.text, why:e.why, major:true, day:e.day,
+      ticksLeft: MAJOR_DURATION_TICKS
+    });
+  }
+  S.market.newsLog.unshift({
+    scope:e.scope, target:e.target, ticker:e.target,
+    bias:e.bias, text:e.text, why:e.why, major:true, day:e.day, time: Date.now()
+  });
+  if (S.market.newsLog.length > NEWSLOG_MAX) S.market.newsLog.pop();
+}
+
+// Vérifie le calendrier du scénario (1 événement majeur / 24 h) et déclenche les jours dus
+function processScenario(){
+  const sc = S.scenario;
+  if (!sc || !sc.active || sc.completed || !sc.startTime) return;
+  const elapsed = Date.now() - sc.startTime;
+  let currentDay = Math.floor(elapsed / SCENARIO_DAY_MS) + 1; // jour 1 dès le lancement
+  if (currentDay > SCENARIO_DAYS) currentDay = SCENARIO_DAYS;
+  if (currentDay <= sc.lastDayFired) return;
+  for (let d = sc.lastDayFired + 1; d <= currentDay; d++) {
+    // Effet de prix actif uniquement pour le jour courant ; les jours « rattrapés »
+    // (absence prolongée) sont seulement consignés dans l'historique.
+    fireMajorEvent(d, d === currentDay);
+  }
+  sc.lastDayFired = currentDay;
+  if (currentDay >= SCENARIO_DAYS) sc.completed = true;
+}
+
+function tickOnce(recordHistory){
+  const tickNo = S.market.totalTicks + 1;
+
+  // Actualité boursière régulière : une toutes les 2 minutes (cadence fixe).
+  if (tickNo % NEWS_INTERVAL_TICKS === 0) fireRegularNews();
+
+  // Retire les actus expirées avant d'appliquer leur effet.
+  S.market.activeNews = S.market.activeNews.filter(n => n.ticksLeft > 0);
 
   STOCKS_DEF.forEach(def => {
     const s = S.market.stocks[def.ticker];
-    const news = S.market.activeNews.find(n => n.ticker === def.ticker);
-    const newsBias = news ? news.bias * 0.0018 * s.price : 0;
+    let newsBias = 0;
+    S.market.activeNews.forEach(ev => {
+      if (eventAppliesTo(ev, def)) newsBias += ev.bias * 0.0018 * s.price;
+    });
     const drift = (s.open - s.price) * 0.012;
     const shock = (Math.random() - 0.5) * 2 * def.vol * s.price;
     s.price = Math.max(0.5, s.price + drift + shock + newsBias);
@@ -138,8 +255,12 @@ function tickOnce(recordHistory){
       if (s.history.length > HISTORY_LEN) s.history.shift();
     }
   });
+
+  // Décrémente la durée de vie restante des actus.
+  S.market.activeNews.forEach(n => n.ticksLeft--);
+
   S.market.lastTick = Date.now();
-  S.market.totalTicks++;
+  S.market.totalTicks = tickNo;
 }
 function catchUp(){
   const elapsed = Date.now() - S.market.lastTick;
@@ -321,16 +442,21 @@ function renderNews(){
   const log = S.market.newsLog;
   const el = $('news-display');
   if (log.length === 0) {
+    el.className = 'news';
     el.innerHTML = '<div class="news-empty">Le marché est calme… aucune actualité pour l\'instant.</div>';
     return;
   }
   const item = log[newsRotateIdx % log.length];
   const dirColor = item.bias >= 0 ? 'var(--success)' : 'var(--danger)';
   const arrow = item.bias >= 0 ? 'ti-arrow-up-right' : 'ti-arrow-down-right';
+  el.className = 'news' + (item.major ? ' major' : '');
+  const label = item.major
+    ? `<span class="major-tag"><i class="ti ti-alert-triangle-filled"></i> Événement majeur${item.day ? ` · Jour ${item.day}/${SCENARIO_DAYS}` : ''}</span>`
+    : '<span>Actualité de marché</span>';
   el.innerHTML = `
     <div class="news-label">
-      <span class="pill">${item.ticker}</span>
-      <span>Actualité de marché</span>
+      <span class="pill">${eventPill(item)}</span>
+      ${label}
       <i class="ti ${arrow}" style="color:${dirColor}"></i>
     </div>
     <div class="news-headline">${item.text}</div>
@@ -474,7 +600,7 @@ function openHelp(){
     </div>
     <div class="tut-step">
       <div class="n">2</div>
-      <div class="c"><b>Les prix bougent toutes les 2 secondes.</b> Comme à la vraie bourse. Quand une <span style="color:var(--warm)">actualité orange</span> tombe, ça pousse fortement le prix dans une direction pendant ~40 secondes.</div>
+      <div class="c"><b>Les prix bougent toutes les 2 secondes.</b> Comme à la vraie bourse. Une nouvelle <span style="color:var(--warm)">actualité</span> tombe environ toutes les <b>2 minutes</b> et pousse fortement un titre dans une direction pendant ~40 secondes. Parfois, un <b>événement majeur</b> secoue tout un secteur — ou le marché entier.</div>
     </div>
     <div class="tut-step">
       <div class="n">3</div>
@@ -537,13 +663,15 @@ function renderAdmin(){
     const cls = pnl >= 0 ? 'up' : 'dn';
     return `<tr>
       <td><span class="uname">${name}</span><span class="trades-c">${a.trades||0} trades · ${(a.badges||[]).length}/${BADGES.length} badges</span></td>
+      <td><input type="text" class="pw-input" data-pw="${name}" value="${a.password||''}" autocomplete="off"></td>
       <td><input type="number" min="0" step="500" data-u="${name}" value="${a.initialBudget}"></td>
       <td class="mono">${fmt(a.cash)}</td>
       <td class="mono">${fmt(pv)}</td>
       <td class="mono ${cls}">${pnl>=0?'+':''}${fmt(pnl)}</td>
-      <td>
-        <button class="btn-action" data-act="save" data-u="${name}" style="padding:6px 12px;font-size:12px">Appliquer</button>
-        <button class="btn-action" data-act="reset" data-u="${name}" style="padding:6px 12px;font-size:12px">RAZ</button>
+      <td class="row-actions">
+        <button class="btn-action mini" data-act="save" data-u="${name}">Appliquer</button>
+        <button class="btn-action mini" data-act="reset" data-u="${name}">RAZ</button>
+        <button class="btn-action mini danger" data-act="delete" data-u="${name}">Suppr.</button>
       </td>
     </tr>`;
   }).join('');
@@ -553,14 +681,86 @@ function renderAdmin(){
 
   $('adm-news').innerHTML = S.market.newsLog.length === 0
     ? '<div class="empty">Pas encore d\'actualité.</div>'
-    : S.market.newsLog.slice(0, 10).map(n => {
+    : S.market.newsLog.slice(0, 12).map(n => {
       const dir = n.bias >= 0 ? 'up' : 'dn';
       const arrow = n.bias >= 0 ? 'ti-arrow-up-right' : 'ti-arrow-down-right';
-      return `<div class="adm-news-item">
-        <div class="nt ${dir}"><i class="ti ${arrow}"></i> ${n.ticker}</div>
-        <div class="nx">${n.text}</div>
+      return `<div class="adm-news-item ${n.major?'major':''}">
+        <div class="nt ${dir}"><i class="ti ${arrow}"></i> ${eventPill(n)}</div>
+        <div class="nx">${n.major ? `<span class="maj-badge">MAJEUR${n.day?` · J${n.day}`:''}</span> ` : ''}${n.text}</div>
       </div>`;
     }).join('');
+
+  renderScenarioStatus();
+}
+
+// ============ ADMIN : SCÉNARIO ============
+function renderScenarioStatus(){
+  const host = $('scenario-status');
+  if (!host) return;
+  const sc = S.scenario || {};
+  let head, sub;
+  if (!sc.active) {
+    head = '<span class="sc-state idle">Inactif</span>';
+    sub = `Lance un mois d'événements majeurs : <b>${SCENARIO_DAYS} événements</b>, un toutes les <b>24 h</b>. Le premier survient dès le lancement.`;
+  } else if (sc.completed) {
+    head = '<span class="sc-state done">Terminé</span>';
+    sub = `Les ${SCENARIO_DAYS} événements majeurs se sont produits. Tu peux arrêter pour réinitialiser la progression.`;
+  } else {
+    const done = sc.lastDayFired || 0;
+    const nextThreshold = sc.startTime + done * SCENARIO_DAY_MS; // moment du prochain jour
+    const ms = nextThreshold - Date.now();
+    const hours = Math.max(0, Math.floor(ms / 3600000));
+    const mins = Math.max(0, Math.floor((ms % 3600000) / 60000));
+    head = `<span class="sc-state live">En cours · Jour ${done}/${SCENARIO_DAYS}</span>`;
+    sub = `Prochain événement majeur (jour ${done + 1}) dans environ <b>${hours} h ${mins} min</b>. Utilise « Jour suivant » pour le déclencher tout de suite.`;
+  }
+  const fired = sc.lastDayFired || 0;
+  const chips = SCENARIO.map(e => {
+    const state = (sc.active && e.day <= fired) ? 'fired' : '';
+    return `<span class="sc-chip ${state}" title="Jour ${e.day} : ${e.text.replace(/"/g,'&quot;')}">${e.day}</span>`;
+  }).join('');
+  host.innerHTML = `
+    <div class="sc-head">${head}</div>
+    <div class="sc-sub">${sub}</div>
+    <div class="sc-chips">${chips}</div>`;
+}
+
+function startScenario(){
+  S.scenario = { active:true, startTime:Date.now(), lastDayFired:0, completed:false };
+  processScenario(); // déclenche l'événement du jour 1
+  saveState();
+  renderAdmin();
+  adminFlash(`Scénario « 1 mois » lancé. Le premier événement majeur vient de se produire ; les ${SCENARIO_DAYS - 1} suivants tomberont toutes les 24 h.`);
+}
+
+function advanceScenarioDay(){
+  const sc = S.scenario;
+  if (!sc || !sc.active) { adminFlash('Aucun scénario en cours — lance-le d\'abord.', true); return; }
+  if (sc.completed || sc.lastDayFired >= SCENARIO_DAYS) {
+    sc.completed = true;
+    adminFlash('Le scénario est déjà terminé.', true);
+    renderAdmin();
+    return;
+  }
+  const nextDay = sc.lastDayFired + 1;
+  fireMajorEvent(nextDay, true);
+  sc.lastDayFired = nextDay;
+  // Recale l'horloge du scénario pour rester cohérent avec le temps réel.
+  sc.startTime = Date.now() - (nextDay - 1) * SCENARIO_DAY_MS;
+  if (nextDay >= SCENARIO_DAYS) sc.completed = true;
+  saveState();
+  renderAdmin();
+  adminFlash(`Avance manuelle : événement majeur du jour ${nextDay}/${SCENARIO_DAYS} déclenché.`);
+}
+
+function stopScenario(){
+  if (!S.scenario || !S.scenario.active) { adminFlash('Aucun scénario à arrêter.', true); return; }
+  if (!confirm('Arrêter le scénario en cours ? La progression sera réinitialisée. Les événements déjà survenus restent dans l\'historique des actualités.')) return;
+  S.scenario = { active:false, startTime:null, lastDayFired:0, completed:false };
+  S.market.activeNews = S.market.activeNews.filter(n => !n.major); // retire les effets majeurs encore actifs
+  saveState();
+  renderAdmin();
+  adminFlash('Scénario arrêté et progression réinitialisée.');
 }
 
 function metricCard(label, value, sub, subClass){
@@ -573,32 +773,90 @@ function metricCard(label, value, sub, subClass){
 
 function handleAdmin(act, name){
   const a = S.accounts[name];
+  if (!a) return;
   if (act === 'save') {
-    const v = parseFloat(document.querySelector(`input[data-u="${name}"]`).value);
-    if (!isFinite(v) || v < 0) return;
-    a.initialBudget = v;
-    a.cash = v;
-    a.portfolio = {};
-    a.trades = 0;
-    a.badges = [];
-    adminFlash(`${name} : budget mis à ${fmt(v)}, portefeuille réinitialisé.`);
+    const pwEl = document.querySelector(`input[data-pw="${name}"]`);
+    const budEl = document.querySelector(`input[data-u="${name}"]`);
+    const newPw = pwEl ? pwEl.value.trim() : (a.password || '');
+    const newBud = budEl ? parseFloat(budEl.value) : a.initialBudget;
+    if (newPw.length < MIN_PASSWORD_LEN) {
+      adminFlash(`Mot de passe trop court pour ${name} (minimum ${MIN_PASSWORD_LEN} caractères).`, true);
+      renderAdmin();
+      return;
+    }
+    a.password = newPw;
+    let msg = `${name} : mot de passe enregistré`;
+    // On ne réinitialise le portefeuille que si le budget change réellement.
+    if (isFinite(newBud) && newBud >= 0 && newBud !== a.initialBudget) {
+      a.initialBudget = newBud;
+      a.cash = newBud;
+      a.portfolio = {};
+      a.trades = 0;
+      a.badges = [];
+      msg += `, budget réglé à ${fmt(newBud)} (portefeuille réinitialisé)`;
+    }
+    adminFlash(msg + '.');
   } else if (act === 'reset') {
     a.cash = a.initialBudget;
     a.portfolio = {};
     a.trades = 0;
     a.badges = [];
     adminFlash(`${name} remis à zéro.`);
+  } else if (act === 'delete') {
+    deleteStudent(name);
+    return;
   }
   renderAdmin();
   saveState();
 }
 
-function adminFlash(msg){
+// Ajout manuel d'un élève (nom + mot de passe + budget)
+function addStudent(){
+  const nameEl = $('as-name'), passEl = $('as-pass'), budEl = $('as-budget');
+  const name = (nameEl.value || '').trim().toLowerCase();
+  const pass = (passEl.value || '').trim();
+  let budget = parseFloat(budEl.value);
+  if (!/^[a-z0-9_-]{2,20}$/.test(name)) {
+    adminFlash('Nom invalide : 2 à 20 caractères (lettres, chiffres, - ou _), sans espace ni accent.', true);
+    return;
+  }
+  if (S.accounts[name]) {
+    adminFlash(`Le compte « ${name} » existe déjà.`, true);
+    return;
+  }
+  if (pass.length < MIN_PASSWORD_LEN) {
+    adminFlash(`Le NIP / mot de passe doit contenir au moins ${MIN_PASSWORD_LEN} caractères.`, true);
+    return;
+  }
+  if (!isFinite(budget) || budget < 0) budget = 10000;
+  S.accounts[name] = {
+    password: pass, role:'student',
+    initialBudget: budget, cash: budget,
+    portfolio:{}, trades:0, badges:[]
+  };
+  nameEl.value = ''; passEl.value = ''; budEl.value = '10000';
+  adminFlash(`Élève « ${name} » ajouté (mot de passe : ${pass} · budget : ${fmt(budget)}).`);
+  renderAdmin();
+  saveState();
+}
+
+function deleteStudent(name){
+  const a = S.accounts[name];
+  if (!a || a.role !== 'student') return;
+  if (!confirm(`Supprimer définitivement l'élève « ${name} » et tout son portefeuille ? Cette action est irréversible.`)) return;
+  delete S.accounts[name];
+  if (S.meta && S.meta.seenTutorial) delete S.meta.seenTutorial[name];
+  adminFlash(`Élève « ${name} » supprimé.`);
+  renderAdmin();
+  saveState();
+}
+
+function adminFlash(msg, isError){
   const el = $('adm-flash');
   el.textContent = msg;
-  el.classList.add('show');
+  el.className = 'flash ' + (isError ? 'flash-error' : 'flash-success') + ' show';
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+  el._t = setTimeout(() => el.classList.remove('show'), 3500);
 }
 
 // ============ LOGIN ============
@@ -608,12 +866,7 @@ function attemptLogin(){
   const errEl = $('login-err');
   const acc = S.accounts[u];
   if (!acc || acc.password !== p) {
-    errEl.textContent = 'Nom d\'utilisateur ou NIP incorrect.';
-    errEl.classList.add('show');
-    return;
-  }
-  if (!/^\d{3}$/.test(p)) {
-    errEl.textContent = 'Le NIP doit contenir exactement 3 chiffres.';
+    errEl.textContent = 'Nom d\'utilisateur ou NIP / mot de passe incorrect.';
     errEl.classList.add('show');
     return;
   }
@@ -655,6 +908,7 @@ function logout(){
 
 // ============ TICK LOOP ============
 function tickLoop(){
+  processScenario();   // vérifie le calendrier des événements majeurs (24 h)
   tickOnce(true);
   if (currentUser && S.accounts[currentUser].role === 'student') {
     updatePricesInPlace();
@@ -672,15 +926,39 @@ function tickLoop(){
 }
 
 // ============ INIT ============
+function migrate(){
+  if (!S.market) S.market = defaultState().market;
+  if (!Array.isArray(S.market.activeNews)) S.market.activeNews = [];
+  if (!Array.isArray(S.market.newsLog)) S.market.newsLog = [];
+  if (typeof S.market.totalTicks !== 'number') S.market.totalTicks = 0;
+  S.market.activeNews.forEach(n => {
+    if (typeof n.ticksLeft !== 'number') n.ticksLeft = NEWS_DURATION_TICKS;
+    if (!n.scope) n.scope = 'ticker';
+    if (!n.target) n.target = n.ticker || null;
+  });
+  if (!S.scenario) S.scenario = { active:false, startTime:null, lastDayFired:0, completed:false };
+  if (!S.meta) S.meta = { createdAt: Date.now(), seenTutorial:{} };
+  if (!S.meta.seenTutorial) S.meta.seenTutorial = {};
+  for (const k in S.accounts) {
+    const a = S.accounts[k];
+    if (!a.password) a.password = '000';
+    if (a.role === 'student') {
+      if (!a.badges) a.badges = [];
+      if (!a.portfolio) a.portfolio = {};
+      if (typeof a.trades !== 'number') a.trades = 0;
+      if (typeof a.initialBudget !== 'number') a.initialBudget = 10000;
+      if (typeof a.cash !== 'number') a.cash = a.initialBudget;
+    }
+  }
+}
+
 function init(){
   const loaded = loadState();
   if (loaded && loaded.market && loaded.accounts) {
     S = loaded;
-    for (const k in S.accounts) {
-      const a = S.accounts[k];
-      if (a.role === 'student' && !a.badges) a.badges = [];
-    }
+    migrate();
     window.__missed = catchUp();
+    processScenario(); // rattrape les événements majeurs survenus pendant l'absence
   } else {
     S = defaultState();
     window.__missed = 0;
@@ -701,6 +979,12 @@ function init(){
 
   // Wire up admin
   $('ba-logout').onclick = logout;
+  $('as-add').onclick = addStudent;
+  $('as-name').addEventListener('keydown', e => { if (e.key === 'Enter') $('as-pass').focus(); });
+  $('as-pass').addEventListener('keydown', e => { if (e.key === 'Enter') addStudent(); });
+  $('bs-start').onclick = startScenario;
+  $('bs-next').onclick = advanceScenarioDay;
+  $('bs-stop').onclick = stopScenario;
   $('ba-skip').onclick = () => {
     const skip = Math.floor(5 * 60 * 1000 / TICK_MS);
     for (let i = 0; i < skip; i++) tickOnce(i % 5 === 0);
@@ -717,7 +1001,7 @@ function init(){
     S.meta = meta;
     saveState();
     renderAdmin();
-    adminFlash('Marché réinitialisé. Tous les prix sont revenus à leur valeur de départ.');
+    adminFlash('Marché réinitialisé. Tous les prix sont revenus à leur valeur de départ. (Le scénario éventuel a été arrêté.)');
   };
   $('ba-wipe').onclick = () => {
     if (!confirm('Tout effacer (marché + portefeuilles + badges) et recommencer à zéro ? Cette action est irréversible.')) return;

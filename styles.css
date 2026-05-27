@@ -237,5 +237,45 @@ a{color:var(--accent);text-decoration:none}
 .adm-table .trades-c{color:var(--text3);font-size:11px;margin-left:6px;font-family:var(--mono)}
 .adm-news-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);font-size:13px}
 .adm-news-item:last-child{border-bottom:none}
-.adm-news-item .nt{font-family:var(--mono);font-weight:500;min-width:70px}
+.adm-news-item .nt{font-family:var(--mono);font-weight:500;min-width:90px}
 .adm-news-item .nx{flex:1;color:var(--text2)}
+
+/* Admin: password input + compact / danger buttons */
+.adm-table .pw-input{width:120px;font-family:var(--mono)}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn-action.mini{padding:6px 10px;font-size:12px}
+.btn-action.danger{color:var(--danger);border-color:var(--danger)}
+.btn-action.danger:hover{background:var(--danger-tint)}
+
+/* Admin: add-student form */
+.add-student{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px}
+.add-student .as-field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:150px}
+.add-student .as-budget-field{flex:0 0 140px;min-width:120px}
+.add-student label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.add-student input{padding:9px 12px;border:1.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);font-size:14px}
+.add-student input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+.add-student .btn-action{flex:0 0 auto;padding:11px 16px}
+@media (max-width:680px){.add-student .as-field,.add-student .as-budget-field{flex:1 1 100%}.add-student .btn-action{width:100%;justify-content:center}}
+
+/* Admin: monthly scenario */
+.scenario-card{border-left:4px solid var(--gold)}
+.scenario-status .sc-head{margin-bottom:8px}
+.sc-state{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;padding:4px 10px;border-radius:20px}
+.sc-state.idle{background:var(--inset);color:var(--text2)}
+.sc-state.live{background:var(--gold-tint);color:var(--gold)}
+.sc-state.done{background:var(--success-tint);color:var(--success)}
+.scenario-status .sc-sub{font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:14px}
+.scenario-status .sc-sub b{color:var(--text);font-weight:500}
+.sc-chips{display:flex;flex-wrap:wrap;gap:5px}
+.sc-chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:var(--inset);border:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--text3);cursor:default}
+.sc-chip.fired{background:var(--gold-tint);border-color:var(--gold);color:var(--gold);font-weight:500}
+
+/* Major event highlight — student news card */
+.news.major::before{background:var(--gold);width:5px}
+.news.major{box-shadow:0 0 0 1px var(--gold),var(--shadow)}
+.major-tag{display:inline-flex;align-items:center;gap:5px;color:var(--gold);font-weight:600}
+.major-tag i{color:var(--gold)}
+
+/* Major event highlight — admin feed */
+.adm-news-item.major .nx{color:var(--text)}
+.maj-badge{display:inline-block;background:var(--gold-tint);color:var(--gold);font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.5px;padding:1px 6px;border-radius:8px;margin-right:4px;vertical-align:middle}

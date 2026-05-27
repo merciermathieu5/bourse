@@ -41,15 +41,15 @@
   <div class="panel right">
     <div class="inner">
       <h2>Connecte-toi</h2>
-      <div class="sub">Entre ton nom d'utilisateur et ton NIP à 3 chiffres.</div>
+      <div class="sub">Entre ton nom d'utilisateur et ton NIP ou mot de passe.</div>
       <div class="err" id="login-err"></div>
       <div class="field">
         <label for="li-user">Nom d'utilisateur</label>
         <input type="text" id="li-user" placeholder="alex, sam, jordan, prof" autocomplete="off" autofocus>
       </div>
       <div class="field">
-        <label for="li-pass">NIP (3 chiffres)</label>
-        <input type="password" id="li-pass" maxlength="3" inputmode="numeric" pattern="[0-9]*" placeholder="•••">
+        <label for="li-pass">NIP / mot de passe</label>
+        <input type="password" id="li-pass" maxlength="40" autocomplete="off" placeholder="•••">
       </div>
       <button class="btn-go" id="li-go">Entrer dans le marché →</button>
       <div class="accounts">
@@ -131,13 +131,43 @@
     <div class="section-h"><h3>Tableau de bord</h3></div>
     <div class="adm-grid" id="adm-metrics"></div>
     <div class="flash flash-success" id="adm-flash"></div>
+
+    <div class="section-h"><h3>Ajouter un élève</h3></div>
+    <div class="card add-student">
+      <div class="as-field">
+        <label for="as-name">Nom d'utilisateur</label>
+        <input type="text" id="as-name" placeholder="ex. marie" autocomplete="off">
+      </div>
+      <div class="as-field">
+        <label for="as-pass">NIP / mot de passe</label>
+        <input type="text" id="as-pass" placeholder="ex. 123 ou motdepasse" autocomplete="off">
+      </div>
+      <div class="as-field as-budget-field">
+        <label for="as-budget">Budget initial</label>
+        <input type="number" id="as-budget" min="0" step="500" value="10000">
+      </div>
+      <button class="btn-action primary" id="as-add"><i class="ti ti-user-plus"></i>Ajouter l'élève</button>
+    </div>
+
     <div class="section-h"><h3>Mes étudiants</h3></div>
-    <table class="adm-table"><thead><tr><th>Étudiant</th><th>Budget initial</th><th>Liquidités</th><th>Portefeuille</th><th>Gains / pertes</th><th></th></tr></thead><tbody id="adm-tbody"></tbody></table>
+    <table class="adm-table"><thead><tr><th>Étudiant</th><th>Mot de passe</th><th>Budget initial</th><th>Liquidités</th><th>Portefeuille</th><th>Gains / pertes</th><th></th></tr></thead><tbody id="adm-tbody"></tbody></table>
     <div class="adm-actions">
       <button class="btn-action" id="ba-skip"><i class="ti ti-clock-bolt"></i>Avancer de 5 minutes</button>
       <button class="btn-action" id="ba-reset"><i class="ti ti-refresh"></i>Réinitialiser le marché</button>
       <button class="btn-action" id="ba-wipe" style="color:var(--danger);border-color:var(--danger)"><i class="ti ti-trash"></i>Tout effacer</button>
     </div>
+
+    <div style="margin-top:32px"></div>
+    <div class="section-h"><h3>Scénario du mois <span class="count">événements majeurs · 1 par 24 h · 30 jours</span></h3></div>
+    <div class="card scenario-card">
+      <div id="scenario-status" class="scenario-status"></div>
+      <div class="adm-actions" style="margin-top:18px">
+        <button class="btn-action primary" id="bs-start"><i class="ti ti-player-play"></i>Lancer le scénario</button>
+        <button class="btn-action" id="bs-next"><i class="ti ti-calendar-event"></i>Jour suivant</button>
+        <button class="btn-action" id="bs-stop" style="color:var(--danger);border-color:var(--danger)"><i class="ti ti-player-stop"></i>Arrêter le scénario</button>
+      </div>
+    </div>
+
     <div style="margin-top:32px"></div>
     <div class="section-h"><h3>Fil d'actualités</h3></div>
     <div class="card" id="adm-news"></div>

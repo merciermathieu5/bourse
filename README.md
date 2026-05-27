@@ -9,10 +9,10 @@ Un simulateur boursier éducatif pour adolescents (16+), conçu pour faire déco
 ## ✨ Ce que ça fait
 
 - **20 grands titres** répartis dans 4 secteurs : Technologies (AAPL, MSFT, NVDA, GOOGL, META), Communications (VZ, T, TMUS, CMCSA, CHTR), Métaux (BHP, RIO, VALE, NEM, FCX) et Manufacturier (CAT, GE, BA, HON, MMM).
-- **Marché en direct** : les cours évoluent toutes les 2 secondes avec une marche aléatoire calibrée par titre (NVDA et BA sont plus volatils que VZ, comme dans la réalité).
-- **Fil d'actualités pédagogique** : une actu tombe **toutes les 2 minutes** (cadence déterministe, plus de hasard) et fait dériver un titre, un secteur entier ou tout le marché pendant 40 secondes. Chaque actu est accompagnée d'une explication *« Pourquoi ? »* qui décortique le lien entre la nouvelle et le prix.
+- **Marché en direct** : les cours se mettent à jour **toutes les 2 minutes** (un mouvement net à chaque fois, pas d'agitation continue), avec une marche aléatoire calibrée par titre (NVDA et BA sont plus volatils que VZ, comme dans la réalité).
+- **Fil d'actualités pédagogique** : à **chaque mise à jour de prix** (donc toutes les 2 minutes), une actu fait dériver un titre, un secteur entier ou tout le marché. Chaque actu est accompagnée d'une explication *« Pourquoi ? »* qui décortique le lien entre la nouvelle et le prix.
 - **Scénario « 1 mois de marché »** : 30 événements **majeurs**, un par tranche de 24 h, qui racontent une vraie chronique boursière (baisse des taux → rallye tech → choc sur les métaux → crash Boeing → rebond de fin de mois…). L'enseignant le lance d'un clic et peut avancer jour par jour pour une démo en classe sans attendre un mois réel.
-- **Persistance complète** via `localStorage` : ferme l'onglet, reviens dans 2 jours — le marché a continué de bouger et tu vois ce qui s'est passé en ton absence (jusqu'à 500 ticks de rattrapage, soit ~17 minutes simulées).
+- **Persistance complète** via `localStorage` : ferme l'onglet, reviens plus tard — le marché a continué d'avancer et tu vois ce qui s'est passé en ton absence (jusqu'à 30 mises à jour de rattrapage, soit ~1 heure de marché simulée).
 - **Mode enseignant** : tableau de bord de tous les étudiants, **ajout manuel d'élèves avec leur mot de passe**, modification du mot de passe et du budget de chacun, suppression de comptes, ajustement des budgets, accélération du temps (avance de 5 min instantanément pour les démos en classe) et pilotage du scénario du mois.
 - **Système de badges** et **classement de classe** pour la motivation.
 - **Mini-graphiques** sur chaque titre + graphique détaillé en cliquant sur le symbole.
@@ -90,23 +90,24 @@ Tout est en **vanilla JS, HTML et CSS** — pas de framework, pas de build, pas 
 Toutes les constantes principales sont en haut de `app.js` :
 
 ```js
-const TICK_MS = 2000;            // Vitesse du marché (ms entre ticks)
-const HISTORY_LEN = 60;          // Nombre de points sur les graphiques
-const MAX_CATCHUP_TICKS = 500;   // Plafond du rattrapage temporel
-const NEWS_DURATION_TICKS = 20;  // Durée d'effet d'une actu courante
+// Un « tick » = une mise à jour de prix. Le marché ne bouge QUE toutes les 2 minutes.
+const TICK_MS = 120000;          // intervalle entre deux mises à jour de prix (ms)
+const HISTORY_LEN = 60;          // nombre de points sur les graphiques (= 2 h de marché)
+const MAX_CATCHUP_TICKS = 30;    // rattrapage au retour, plafonné à ~1 h de marché
+const NEWS_DURATION_TICKS = 1;   // une actu régulière influence la mise à jour où elle tombe
 
-// Cadence des actualités : une actu toutes les 2 minutes (déterministe)
+// Cadence des actualités : une actu par mise à jour, soit une toutes les 2 minutes
 const NEWS_INTERVAL_MS = 120000;
 
 // Scénario d'événements majeurs : un par 24 h, pendant 1 mois
 const SCENARIO_DAYS = 30;
 const SCENARIO_DAY_MS = 24 * 60 * 60 * 1000;
-const MAJOR_DURATION_TICKS = 75; // durée d'effet d'un événement majeur (~2,5 min)
+const MAJOR_DURATION_TICKS = 3;  // un événement majeur domine ~3 mises à jour (~6 min)
 
 const MIN_PASSWORD_LEN = 3;      // longueur minimale d'un NIP / mot de passe
 ```
 
-> 💡 Pour une démo plus rapide en classe, baisse `NEWS_INTERVAL_MS` (p. ex. `20000` pour une actu toutes les 20 s) et utilise le bouton **« Jour suivant »** du scénario pour enchaîner les événements majeurs sans attendre 24 h réelles.
+> 💡 **Régler la vitesse du marché.** Pour des cours qui bougent plus souvent (utile en démo), baisse `TICK_MS` — par exemple `20000` pour une mise à jour toutes les 20 secondes. Comme une actu accompagne chaque mise à jour, leur cadence suit automatiquement. Le bouton **« Avancer de 30 minutes »** de l'espace enseignant fait défiler le marché d'un coup, et **« Jour suivant »** enchaîne les événements majeurs du scénario sans attendre 24 h réelles.
 
 Tu peux aussi modifier :
 - La liste des titres (`STOCKS_DEF`) — ticker, nom, secteur, prix de base, volatilité

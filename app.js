@@ -3,19 +3,21 @@
 
 // ============ CONFIG ============
 const STORAGE_KEY = 'bourse_ecole_v1';
-const TICK_MS = 2000;
-const HISTORY_LEN = 60;
-const MAX_CATCHUP_TICKS = 500;
-const NEWS_DURATION_TICKS = 20;
+// Les cours ne bougent QUE toutes les 2 minutes : un « tick » = une mise à jour de prix = 2 min.
+const TICK_MS = 120000;
+const HISTORY_LEN = 60;            // 60 points de graphique = 2 h de marché
+const MAX_CATCHUP_TICKS = 30;      // rattrapage au retour plafonné à ~1 h de marché manqué
+const NEWS_DURATION_TICKS = 1;     // une actu régulière influence la mise à jour où elle tombe
 
-// Cadence des actualités : un événement boursier toutes les 2 minutes (déterministe).
+// Cadence des actualités : un événement boursier toutes les 2 minutes (déterministe),
+// soit exactement une par mise à jour de prix.
 const NEWS_INTERVAL_MS = 120000;
 const NEWS_INTERVAL_TICKS = Math.max(1, Math.round(NEWS_INTERVAL_MS / TICK_MS));
 
 // Scénario d'événements MAJEURS : un par 24 h, pendant 1 mois (30 jours).
 const SCENARIO_DAYS = 30;
 const SCENARIO_DAY_MS = 24 * 60 * 60 * 1000;
-const MAJOR_DURATION_TICKS = 75;   // durée d'effet d'un événement majeur (~2,5 min)
+const MAJOR_DURATION_TICKS = 3;    // un événement majeur domine ~3 mises à jour (~6 min)
 
 const MIN_PASSWORD_LEN = 3;        // longueur minimale d'un NIP / mot de passe
 const NEWSLOG_MAX = 30;            // nombre d'actualités conservées dans l'historique
@@ -245,7 +247,7 @@ function tickOnce(recordHistory){
     const s = S.market.stocks[def.ticker];
     let newsBias = 0;
     S.market.activeNews.forEach(ev => {
-      if (eventAppliesTo(ev, def)) newsBias += ev.bias * 0.0018 * s.price;
+      if (eventAppliesTo(ev, def)) newsBias += ev.bias * 0.006 * s.price;
     });
     const drift = (s.open - s.price) * 0.012;
     const shock = (Math.random() - 0.5) * 2 * def.vol * s.price;
@@ -600,7 +602,7 @@ function openHelp(){
     </div>
     <div class="tut-step">
       <div class="n">2</div>
-      <div class="c"><b>Les prix bougent toutes les 2 secondes.</b> Comme à la vraie bourse. Une nouvelle <span style="color:var(--warm)">actualité</span> tombe environ toutes les <b>2 minutes</b> et pousse fortement un titre dans une direction pendant ~40 secondes. Parfois, un <b>événement majeur</b> secoue tout un secteur — ou le marché entier.</div>
+      <div class="c"><b>Les prix se mettent à jour toutes les 2 minutes.</b> À chaque mise à jour, une nouvelle <span style="color:var(--warm)">actualité</span> tombe et pousse un titre (ou tout un secteur) dans une direction. Chaque actu est expliquée par un « Pourquoi ? ». Parfois, un <b>événement majeur</b> secoue tout un secteur — ou le marché entier — sur plusieurs mises à jour.</div>
     </div>
     <div class="tut-step">
       <div class="n">3</div>
@@ -912,8 +914,9 @@ function tickLoop(){
   tickOnce(true);
   if (currentUser && S.accounts[currentUser].role === 'student') {
     updatePricesInPlace();
-    // Full re-render every 3 ticks (6 sec) for change% and sparklines
-    if (S.market.totalTicks % 3 === 0) renderStocks();
+    // Chaque mise à jour n'arrive que toutes les 2 min : on redessine tout à chaque fois
+    // (variation %, mini-graphiques) plutôt que d'espacer les rendus.
+    renderStocks();
     renderMetrics();
     renderLeaderboard();
     renderPortfolio();
@@ -922,7 +925,7 @@ function tickLoop(){
     renderAdmin();
   }
   tickCount++;
-  if (tickCount % 5 === 0) saveState();
+  saveState();   // on sauvegarde à chaque mise à jour (au plus une fois toutes les 2 min)
 }
 
 // ============ INIT ============
@@ -986,11 +989,11 @@ function init(){
   $('bs-next').onclick = advanceScenarioDay;
   $('bs-stop').onclick = stopScenario;
   $('ba-skip').onclick = () => {
-    const skip = Math.floor(5 * 60 * 1000 / TICK_MS);
-    for (let i = 0; i < skip; i++) tickOnce(i % 5 === 0);
+    const skip = Math.round(30 * 60 * 1000 / TICK_MS); // 30 minutes de marché
+    for (let i = 0; i < skip; i++) tickOnce(true);
     saveState();
     renderAdmin();
-    adminFlash(`Le marché a avancé de 5 minutes (${skip} ticks simulés).`);
+    adminFlash(`Le marché a avancé de 30 minutes (${skip} mises à jour simulées).`);
   };
   $('ba-reset').onclick = () => {
     if (!confirm('Réinitialiser tous les cours et l\'historique des actualités ? Les portefeuilles des étudiants sont conservés.')) return;
